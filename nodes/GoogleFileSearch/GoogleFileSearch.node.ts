@@ -153,6 +153,14 @@ export class GoogleFileSearch implements INodeType {
 				placeholder: 'fileSearchStores/store-id/documents/doc-id',
 			},
 			{
+				displayName: 'Force Delete',
+				name: 'forceDeleteDocument',
+				type: 'boolean',
+				default: true,
+				displayOptions: { show: { resource: ['document'], operation: ['delete'] } },
+				description: 'Whether to force delete even if document contains content',
+			},
+			{
 				displayName: 'Input Data Field',
 				name: 'binaryPropertyName',
 				type: 'string',
@@ -562,11 +570,18 @@ export class GoogleFileSearch implements INodeType {
 						});
 					} else if (operation === 'delete') {
 						const documentName = this.getNodeParameter('documentName', i) as string;
-						result = await this.helpers.httpRequest({
+						const forceDelete = this.getNodeParameter('forceDeleteDocument', i) as boolean;
+						const url = forceDelete
+							? `${BASE_URL}/${documentName}?force=true&key=${apiKey}`
+							: `${BASE_URL}/${documentName}?key=${apiKey}`;
+						await this.helpers.httpRequest({
 							method: 'DELETE',
-							url: `${BASE_URL}/${documentName}?key=${apiKey}`,
+							url,
 							json: true,
+							returnFullResponse: false,
 						});
+						// DELETE returns empty response, so we return success indicator
+						result = { success: true, deleted: documentName };
 					}
 				}
 
