@@ -10,9 +10,20 @@ import {
 const BASE_URL = 'https://generativelanguage.googleapis.com/v1beta';
 
 // Helper function for async sleep
-const sleep = (ms: number): Promise<void> => new Promise((resolve) => {
-	setTimeout(resolve, ms);
-});
+const sleep = (ms: number): Promise<void> =>
+	new Promise((resolve) => {
+		setTimeout(resolve, ms);
+	});
+
+// Helper function to safely serialize response data (removes circular references)
+const safeSerialize = <T>(data: T): T => {
+	try {
+		return JSON.parse(JSON.stringify(data));
+	} catch {
+		// If serialization fails, return an error object
+		return { error: 'Failed to serialize response data' } as unknown as T;
+	}
+};
 
 interface Document {
 	name: string;
@@ -292,8 +303,7 @@ export class GoogleFileSearch implements INodeType {
 				type: 'string',
 				default: '',
 				displayOptions: { show: { resource: ['query'], operation: ['generateContent'] } },
-				description:
-					'Filter query using AIP-160-like syntax. Passed as raw string to the API.',
+				description: 'Filter query using AIP-160-like syntax. Passed as raw string to the API.',
 				placeholder: 'year = 2025 AND episode_type = "rollup"',
 			},
 			{
@@ -399,7 +409,11 @@ export class GoogleFileSearch implements INodeType {
 
 				// ==================== DOCUMENT OPERATIONS ====================
 				else if (resource === 'document') {
-					const storeName = this.getNodeParameter('storeName', i) as string;
+					// Extract store name - support both full resource name and short name
+					let storeName = this.getNodeParameter('storeName', i) as string;
+					if (!storeName.startsWith('fileSearchStores/')) {
+						storeName = `fileSearchStores/${storeName}`;
+					}
 
 					if (operation === 'upload') {
 						const binaryPropertyName = this.getNodeParameter('binaryPropertyName', i) as string;
@@ -418,7 +432,7 @@ export class GoogleFileSearch implements INodeType {
 						}
 
 						// Upload the file
-						const uploadResponse = await this.helpers.httpRequest({
+						const uploadResponse = (await this.helpers.httpRequest({
 							method: 'POST',
 							url: uploadUrl,
 							headers: {
@@ -427,7 +441,7 @@ export class GoogleFileSearch implements INodeType {
 							},
 							body: buffer,
 							json: true,
-						}) as { document?: Document };
+						})) as { document?: Document };
 
 						result = uploadResponse;
 
@@ -438,21 +452,19 @@ export class GoogleFileSearch implements INodeType {
 							const maxWaitMs = maxWaitTime * 1000;
 
 							while (Date.now() - startTime < maxWaitMs) {
-								const docStatus = await this.helpers.httpRequest({
+								const docStatus = (await this.helpers.httpRequest({
 									method: 'GET',
 									url: `${BASE_URL}/${docName}?key=${apiKey}`,
 									json: true,
-								}) as Document;
+								})) as Document;
 
 								if (docStatus.state === 'STATE_ACTIVE') {
 									result = { ...uploadResponse, document: docStatus, status: 'completed' };
 									break;
 								} else if (docStatus.state === 'STATE_FAILED') {
-									throw new NodeOperationError(
-										this.getNode(),
-										'Document processing failed',
-										{ itemIndex: i },
-									);
+									throw new NodeOperationError(this.getNode(), 'Document processing failed', {
+										itemIndex: i,
+									});
 								}
 
 								// Wait 2 seconds before polling again
@@ -460,7 +472,11 @@ export class GoogleFileSearch implements INodeType {
 							}
 
 							if ((result as IDataObject).status !== 'completed') {
-								result = { ...uploadResponse, status: 'timeout', message: 'Document still processing' };
+								result = {
+									...uploadResponse,
+									status: 'timeout',
+									message: 'Document still processing',
+								};
 							}
 						}
 					} else if (operation === 'import') {
@@ -468,13 +484,13 @@ export class GoogleFileSearch implements INodeType {
 						const waitForCompletion = this.getNodeParameter('waitForCompletion', i) as boolean;
 						const maxWaitTime = this.getNodeParameter('maxWaitTime', i, 120) as number;
 
-						const importResponse = await this.helpers.httpRequest({
+						const importResponse = (await this.helpers.httpRequest({
 							method: 'POST',
 							url: `${BASE_URL}/${storeName}:importFile?key=${apiKey}`,
 							headers: { 'Content-Type': 'application/json' },
 							body: { fileName },
 							json: true,
-						}) as { document?: Document };
+						})) as { document?: Document };
 
 						result = importResponse;
 
@@ -485,28 +501,30 @@ export class GoogleFileSearch implements INodeType {
 							const maxWaitMs = maxWaitTime * 1000;
 
 							while (Date.now() - startTime < maxWaitMs) {
-								const docStatus = await this.helpers.httpRequest({
+								const docStatus = (await this.helpers.httpRequest({
 									method: 'GET',
 									url: `${BASE_URL}/${docName}?key=${apiKey}`,
 									json: true,
-								}) as Document;
+								})) as Document;
 
 								if (docStatus.state === 'STATE_ACTIVE') {
 									result = { ...importResponse, document: docStatus, status: 'completed' };
 									break;
 								} else if (docStatus.state === 'STATE_FAILED') {
-									throw new NodeOperationError(
-										this.getNode(),
-										'Document import failed',
-										{ itemIndex: i },
-									);
+									throw new NodeOperationError(this.getNode(), 'Document import failed', {
+										itemIndex: i,
+									});
 								}
 
 								await sleep(2000);
 							}
 
 							if ((result as IDataObject).status !== 'completed') {
-								result = { ...importResponse, status: 'timeout', message: 'Document still processing' };
+								result = {
+									...importResponse,
+									status: 'timeout',
+									message: 'Document still processing',
+								};
 							}
 						}
 					} else if (operation === 'list') {
@@ -583,7 +601,10 @@ export class GoogleFileSearch implements INodeType {
 						});
 
 						// Optionally extract just the text if grounding is not needed
-						if (options.includeGrounding === false && (result as any).candidates?.[0]?.content?.parts?.[0]?.text) {
+						if (
+							options.includeGrounding === false &&
+							(result as any).candidates?.[0]?.content?.parts?.[0]?.text
+						) {
 							result = {
 								text: (result as any).candidates[0].content.parts[0].text,
 								model,
@@ -593,7 +614,7 @@ export class GoogleFileSearch implements INodeType {
 				}
 
 				returnData.push({
-					json: result,
+					json: safeSerialize(result),
 					pairedItem: { item: i },
 				});
 			} catch (error) {
@@ -614,4 +635,3 @@ export class GoogleFileSearch implements INodeType {
 		return [returnData];
 	}
 }
-
