@@ -381,11 +381,21 @@ export class GoogleFileSearch implements INodeType {
 							json: true,
 						});
 					} else if (operation === 'list') {
-						result = await this.helpers.httpRequest({
+						const response = (await this.helpers.httpRequest({
 							method: 'GET',
 							url: `${BASE_URL}/fileSearchStores?key=${apiKey}`,
 							json: true,
-						});
+						})) as { fileSearchStores?: IDataObject[] };
+
+						// Return each store as a separate item
+						const stores = response.fileSearchStores || [];
+						for (const store of stores) {
+							returnData.push({
+								json: safeSerialize(store),
+								pairedItem: { item: i },
+							});
+						}
+						continue; // Skip the default push at the end
 					} else if (operation === 'get') {
 						const storeName = this.getNodeParameter('storeName', i) as string;
 						result = await this.helpers.httpRequest({
@@ -528,11 +538,21 @@ export class GoogleFileSearch implements INodeType {
 							}
 						}
 					} else if (operation === 'list') {
-						result = await this.helpers.httpRequest({
+						const response = (await this.helpers.httpRequest({
 							method: 'GET',
 							url: `${BASE_URL}/${storeName}/documents?key=${apiKey}`,
 							json: true,
-						});
+						})) as { documents?: Document[] };
+
+						// Return each document as a separate item
+						const documents = response.documents || [];
+						for (const doc of documents) {
+							returnData.push({
+								json: safeSerialize(doc as unknown as IDataObject),
+								pairedItem: { item: i },
+							});
+						}
+						continue; // Skip the default push at the end
 					} else if (operation === 'get') {
 						const documentName = this.getNodeParameter('documentName', i) as string;
 						result = await this.helpers.httpRequest({
