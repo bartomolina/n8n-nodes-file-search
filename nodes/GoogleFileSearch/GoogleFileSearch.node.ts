@@ -439,27 +439,110 @@ export class GoogleFileSearch implements INodeType {
 						const waitForCompletion = this.getNodeParameter('waitForCompletion', i) as boolean;
 						const maxWaitTime = this.getNodeParameter('maxWaitTime', i, 120) as number;
 
+						// Get metadata
+						const metadataParam = this.getNodeParameter('metadata', i) as {
+							metadataValues?: Array<{ key: string; value: string }>;
+						};
+						const metadataValues = metadataParam.metadataValues || [];
+
 						// Get binary data
 						const binaryData = this.helpers.assertBinaryData(i, binaryPropertyName);
 						const buffer = await this.helpers.getBinaryDataBuffer(i, binaryPropertyName);
 
-						// Build upload URL with display name if provided
-						let uploadUrl = `https://generativelanguage.googleapis.com/upload/v1beta/${storeName}:uploadToFileSearchStore?key=${apiKey}`;
-						if (documentDisplayName) {
-							uploadUrl += `&displayName=${encodeURIComponent(documentDisplayName)}`;
-						}
+						// Build upload URL
+						const uploadUrl = `https://generativelanguage.googleapis.com/upload/v1beta/${storeName}:uploadToFileSearchStore?key=${apiKey}`;
 
-						// Upload the file
-						const uploadResponse = (await this.helpers.httpRequest({
-							method: 'POST',
-							url: uploadUrl,
-							headers: {
-								'X-Goog-Upload-Protocol': 'raw',
-								'Content-Type': binaryData.mimeType || 'application/octet-stream',
-							},
-							body: buffer,
-							json: true,
-						})) as { document?: Document };
+						let uploadResponse: { document?: Document };
+
+						// If we have metadata or display name, use multipart upload
+						if (metadataValues.length > 0 || documentDisplayName) {
+							// Build customMetadata array in the format Google expects
+							const customMetadata: Array<{
+								key: string;
+								stringValue?: string;
+								numericValue?: number;
+							}> = [];
+							for (const { key, value } of metadataValues) {
+								if (key && value !== undefined && value !== null) {
+									// Convert to string first (value might be boolean, number, etc.)
+									const strValue = String(value).trim();
+
+									// Only treat as numeric if:
+									// 1. It's a pure number (integer or float)
+									// 2. The entire string is consumed by the number
+									const numValue = Number(strValue);
+									const isPureNumber =
+										strValue !== '' &&
+										!isNaN(numValue) &&
+										isFinite(numValue) &&
+										String(numValue) === strValue;
+
+									if (isPureNumber) {
+										customMetadata.push({ key, numericValue: numValue });
+									} else {
+										// Everything else is a string (dates, booleans, IDs, etc.)
+										customMetadata.push({ key, stringValue: strValue });
+									}
+								}
+							}
+
+							// Build the metadata JSON part
+							const metadataObj: {
+								displayName?: string;
+								customMetadata?: Array<{
+									key: string;
+									stringValue?: string;
+									numericValue?: number;
+								}>;
+							} = {};
+							if (documentDisplayName) {
+								metadataObj.displayName = documentDisplayName;
+							}
+							if (customMetadata.length > 0) {
+								metadataObj.customMetadata = customMetadata;
+							}
+
+							// Create multipart request body
+							const boundary = '----n8nBoundary' + Date.now().toString(16);
+							const mimeType = binaryData.mimeType || 'application/octet-stream';
+
+							// Build multipart body
+							const metadataPart = Buffer.from(
+								`--${boundary}\r\n` +
+									'Content-Type: application/json; charset=UTF-8\r\n\r\n' +
+									JSON.stringify(metadataObj) +
+									'\r\n',
+							);
+							const filePart = Buffer.from(
+								`--${boundary}\r\n` + `Content-Type: ${mimeType}\r\n\r\n`,
+							);
+							const endBoundary = Buffer.from(`\r\n--${boundary}--`);
+
+							const multipartBody = Buffer.concat([metadataPart, filePart, buffer, endBoundary]);
+
+							uploadResponse = (await this.helpers.httpRequest({
+								method: 'POST',
+								url: uploadUrl,
+								headers: {
+									'X-Goog-Upload-Protocol': 'multipart',
+									'Content-Type': `multipart/related; boundary=${boundary}`,
+								},
+								body: multipartBody,
+								json: true,
+							})) as { document?: Document };
+						} else {
+							// Simple raw upload without metadata
+							uploadResponse = (await this.helpers.httpRequest({
+								method: 'POST',
+								url: uploadUrl,
+								headers: {
+									'X-Goog-Upload-Protocol': 'raw',
+									'Content-Type': binaryData.mimeType || 'application/octet-stream',
+								},
+								body: buffer,
+								json: true,
+							})) as { document?: Document };
+						}
 
 						result = uploadResponse;
 
