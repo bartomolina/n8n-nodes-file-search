@@ -1,0 +1,19 @@
+{
+	"node": "n8n-nodes-file-search.googleFileSearch",
+	"nodeVersion": "1.0",
+	"codexVersion": "1.0",
+	"categories": ["AI", "Data & Storage"],
+	"resources": {
+		"credentialDocumentation": [
+			{
+				"url": "https://ai.google.dev/gemini-api/docs/api-key"
+			}
+		],
+		"primaryDocumentation": [
+			{
+				"url": "https://ai.google.dev/gemini-api/docs/file-search"
+			}
+		]
+	}
+}
+
