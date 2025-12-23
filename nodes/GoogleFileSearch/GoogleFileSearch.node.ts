@@ -716,6 +716,7 @@ export class GoogleFileSearch implements INodeType {
 							headers: { 'Content-Type': 'application/json' },
 							body,
 							json: true,
+							returnFullResponse: false,
 						});
 
 						// Optionally extract just the text if grounding is not needed
