@@ -4,6 +4,7 @@ import {
 	INodeExecutionData,
 	INodeType,
 	INodeTypeDescription,
+	NodeConnectionTypes,
 	NodeOperationError,
 } from 'n8n-workflow';
 
@@ -40,15 +41,15 @@ export class GoogleFileSearch implements INodeType {
 		displayName: 'Google File Search',
 		name: 'googleFileSearch',
 		icon: { light: 'file:gemini.svg', dark: 'file:gemini.svg' },
-		group: ['transform'],
+		group: ['input'],
 		version: 1,
 		subtitle: '={{ $parameter["operation"] + ": " + $parameter["resource"] }}',
 		description: 'Interact with Google File Search API for RAG operations',
 		defaults: {
 			name: 'Google File Search',
 		},
-		inputs: ['main'],
-		outputs: ['main'],
+		inputs: [NodeConnectionTypes.Main],
+		outputs: [NodeConnectionTypes.Main],
 		credentials: [
 			{
 				name: 'googlePalmApi',
