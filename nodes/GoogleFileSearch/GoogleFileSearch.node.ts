@@ -21,7 +21,6 @@ const safeSerialize = <T>(data: T): T => {
 	try {
 		return JSON.parse(JSON.stringify(data));
 	} catch {
-		// If serialization fails, return an error object
 		return { error: 'Failed to serialize response data' } as unknown as T;
 	}
 };
@@ -58,18 +57,18 @@ export class GoogleFileSearch implements INodeType {
 		],
 		usableAsTool: true,
 		properties: [
-			// Resource selector
+			// ==================== RESOURCE SELECTOR ====================
 			{
 				displayName: 'Resource',
 				name: 'resource',
 				type: 'options',
 				noDataExpression: true,
 				options: [
-					{ name: 'Store', value: 'store', description: 'Manage File Search stores' },
 					{ name: 'Document', value: 'document', description: 'Manage documents in stores' },
 					{ name: 'Query', value: 'query', description: 'Query stores with semantic search' },
+					{ name: 'Store', value: 'store', description: 'Manage File Search stores' },
 				],
-				default: 'store',
+				default: 'query',
 			},
 
 			// ==================== STORE OPERATIONS ====================
@@ -81,13 +80,12 @@ export class GoogleFileSearch implements INodeType {
 				displayOptions: { show: { resource: ['store'] } },
 				options: [
 					{ name: 'Create', value: 'create', action: 'Create a file search store' },
-					{ name: 'List', value: 'list', action: 'List all file search stores' },
-					{ name: 'Get', value: 'get', action: 'Get store details' },
 					{ name: 'Delete', value: 'delete', action: 'Delete a store' },
+					{ name: 'Get', value: 'get', action: 'Get store details' },
+					{ name: 'List', value: 'list', action: 'List all file search stores' },
 				],
 				default: 'list',
 			},
-			// Store fields
 			{
 				displayName: 'Display Name',
 				name: 'displayName',
@@ -124,15 +122,14 @@ export class GoogleFileSearch implements INodeType {
 				noDataExpression: true,
 				displayOptions: { show: { resource: ['document'] } },
 				options: [
-					{ name: 'Upload', value: 'upload', action: 'Upload a document to a store' },
+					{ name: 'Delete', value: 'delete', action: 'Delete a document' },
+					{ name: 'Get', value: 'get', action: 'Get document details' },
 					{ name: 'Import', value: 'import', action: 'Import an existing file into a store' },
 					{ name: 'List', value: 'list', action: 'List documents in a store' },
-					{ name: 'Get', value: 'get', action: 'Get document details' },
-					{ name: 'Delete', value: 'delete', action: 'Delete a document' },
+					{ name: 'Upload', value: 'upload', action: 'Upload a document to a store' },
 				],
 				default: 'list',
 			},
-			// Document fields
 			{
 				displayName: 'Store Name',
 				name: 'storeName',
@@ -187,7 +184,6 @@ export class GoogleFileSearch implements INodeType {
 				description: 'The file resource name from the Files API (e.g., files/abc123)',
 				placeholder: 'files/abc123',
 			},
-			// Metadata for upload
 			{
 				displayName: 'Metadata',
 				name: 'metadata',
@@ -207,32 +203,6 @@ export class GoogleFileSearch implements INodeType {
 				],
 				description: 'Custom metadata key-value pairs for filtering during queries',
 			},
-			// Chunking options
-			{
-				displayName: 'Chunking Options',
-				name: 'chunkingOptions',
-				type: 'collection',
-				placeholder: 'Add Chunking Option',
-				displayOptions: { show: { resource: ['document'], operation: ['upload', 'import'] } },
-				default: {},
-				options: [
-					{
-						displayName: 'Max Tokens Per Chunk',
-						name: 'maxTokensPerChunk',
-						type: 'number',
-						default: 256,
-						description: 'Maximum tokens per chunk (default: 256)',
-					},
-					{
-						displayName: 'Max Overlap Tokens',
-						name: 'maxOverlapTokens',
-						type: 'number',
-						default: 20,
-						description: 'Maximum overlapping tokens between chunks (default: 20)',
-					},
-				],
-			},
-			// Wait for completion
 			{
 				displayName: 'Wait for Completion',
 				name: 'waitForCompletion',
@@ -265,36 +235,22 @@ export class GoogleFileSearch implements INodeType {
 				displayOptions: { show: { resource: ['query'] } },
 				options: [
 					{
-						name: 'Generate Content',
-						value: 'generateContent',
-						action: 'Query with file search and generate content',
+						name: 'Search',
+						value: 'search',
+						action: 'Search documents and generate a response',
 					},
 				],
-				default: 'generateContent',
-			},
-			// Query fields
-			{
-				displayName: 'Model',
-				name: 'model',
-				type: 'options',
-				options: [
-					{ name: 'Gemini 3 Flash Preview', value: 'gemini-3-flash-preview' },
-					{ name: 'Gemini 2.5 Flash', value: 'gemini-2.5-flash' },
-					{ name: 'Gemini 2.5 Pro', value: 'gemini-2.5-pro' },
-					{ name: 'Gemini 2.0 Flash', value: 'gemini-2.0-flash' },
-				],
-				default: 'gemini-2.5-flash',
-				displayOptions: { show: { resource: ['query'] } },
+				default: 'search',
 			},
 			{
-				displayName: 'Prompt',
-				name: 'prompt',
+				displayName: 'Query',
+				name: 'query',
 				type: 'string',
-				typeOptions: { rows: 4 },
 				default: '',
-				required: true,
-				displayOptions: { show: { resource: ['query'], operation: ['generateContent'] } },
-				description: 'The prompt/question to ask',
+				displayOptions: { show: { resource: ['query'], operation: ['search'] } },
+				description:
+					'The search query. When used as a tool, use $fromAI() to let the AI Agent provide this value.',
+				placeholder: '{{ $fromAI("query", "The search query") }}',
 			},
 			{
 				displayName: 'Store Names',
@@ -302,7 +258,7 @@ export class GoogleFileSearch implements INodeType {
 				type: 'string',
 				default: '',
 				required: true,
-				displayOptions: { show: { resource: ['query'], operation: ['generateContent'] } },
+				displayOptions: { show: { resource: ['query'], operation: ['search'] } },
 				description: 'Comma-separated list of store names to search',
 				placeholder: 'fileSearchStores/store1,fileSearchStores/store2',
 			},
@@ -311,34 +267,24 @@ export class GoogleFileSearch implements INodeType {
 				name: 'metadataFilter',
 				type: 'string',
 				default: '',
-				displayOptions: { show: { resource: ['query'], operation: ['generateContent'] } },
-				description: 'Filter query using AIP-160-like syntax. Passed as raw string to the API.',
+				displayOptions: { show: { resource: ['query'], operation: ['search'] } },
+				description: 'Filter query using AIP-160-like syntax',
 				placeholder: 'year = 2025 AND episode_type = "rollup"',
 			},
 			{
-				displayName: 'System Prompt',
-				name: 'systemPrompt',
-				type: 'string',
-				typeOptions: { rows: 4 },
-				default: '',
-				displayOptions: { show: { resource: ['query'], operation: ['generateContent'] } },
-				description: 'Optional system instructions for the model',
-			},
-			{
-				displayName: 'Options',
-				name: 'options',
+				displayName: 'Additional Fields',
+				name: 'additionalFields',
 				type: 'collection',
-				placeholder: 'Add Option',
-				displayOptions: { show: { resource: ['query'], operation: ['generateContent'] } },
+				placeholder: 'Add Field',
 				default: {},
+				displayOptions: { show: { resource: ['query'], operation: ['search'] } },
 				options: [
 					{
-						displayName: 'Temperature',
-						name: 'temperature',
-						type: 'number',
-						default: 1.0,
-						typeOptions: { minValue: 0, maxValue: 2, numberPrecision: 1 },
-						description: 'Controls randomness in the response',
+						displayName: 'Include Grounding Metadata',
+						name: 'includeGrounding',
+						type: 'boolean',
+						default: true,
+						description: 'Whether to include source citations in response',
 					},
 					{
 						displayName: 'Max Output Tokens',
@@ -348,11 +294,32 @@ export class GoogleFileSearch implements INodeType {
 						description: 'Maximum tokens in the response',
 					},
 					{
-						displayName: 'Include Grounding Metadata',
-						name: 'includeGrounding',
-						type: 'boolean',
-						default: true,
-						description: 'Whether to include source citations in response',
+						displayName: 'Model',
+						name: 'model',
+						type: 'options',
+						options: [
+							{ name: 'Gemini 2.0 Flash', value: 'gemini-2.0-flash' },
+							{ name: 'Gemini 2.5 Flash', value: 'gemini-2.5-flash' },
+							{ name: 'Gemini 2.5 Pro', value: 'gemini-2.5-pro' },
+							{ name: 'Gemini 3 Flash Preview', value: 'gemini-3-flash-preview' },
+						],
+						default: 'gemini-2.5-flash',
+						description: 'The Gemini model to use for generation',
+					},
+					{
+						displayName: 'System Prompt',
+						name: 'systemPrompt',
+						type: 'string',
+						default: '',
+						description: 'Optional system instructions for the model',
+					},
+					{
+						displayName: 'Temperature',
+						name: 'temperature',
+						type: 'number',
+						default: 1.0,
+						typeOptions: { minValue: 0, maxValue: 2 },
+						description: 'Controls randomness in the response (0-2)',
 					},
 				],
 			},
@@ -371,9 +338,7 @@ export class GoogleFileSearch implements INodeType {
 				const apiKey = credentials.apiKey as string;
 
 				if (!apiKey) {
-					throw new NodeOperationError(this.getNode(), 'API Key is required', {
-						itemIndex: i,
-					});
+					throw new NodeOperationError(this.getNode(), 'API Key is required', { itemIndex: i });
 				}
 
 				let result: IDataObject = {};
@@ -396,15 +361,11 @@ export class GoogleFileSearch implements INodeType {
 							json: true,
 						})) as { fileSearchStores?: IDataObject[] };
 
-						// Return each store as a separate item
 						const stores = response.fileSearchStores || [];
 						for (const store of stores) {
-							returnData.push({
-								json: safeSerialize(store),
-								pairedItem: { item: i },
-							});
+							returnData.push({ json: safeSerialize(store), pairedItem: { item: i } });
 						}
-						continue; // Skip the default push at the end
+						continue;
 					} else if (operation === 'get') {
 						const storeName = this.getNodeParameter('storeName', i) as string;
 						result = await this.helpers.httpRequest({
@@ -418,17 +379,12 @@ export class GoogleFileSearch implements INodeType {
 						const url = forceDelete
 							? `${BASE_URL}/${storeName}?force=true&key=${apiKey}`
 							: `${BASE_URL}/${storeName}?key=${apiKey}`;
-						result = await this.helpers.httpRequest({
-							method: 'DELETE',
-							url,
-							json: true,
-						});
+						result = await this.helpers.httpRequest({ method: 'DELETE', url, json: true });
 					}
 				}
 
 				// ==================== DOCUMENT OPERATIONS ====================
 				else if (resource === 'document') {
-					// Extract store name - support both full resource name and short name
 					let storeName = this.getNodeParameter('storeName', i) as string;
 					if (!storeName.startsWith('fileSearchStores/')) {
 						storeName = `fileSearchStores/${storeName}`;
@@ -440,37 +396,28 @@ export class GoogleFileSearch implements INodeType {
 						const waitForCompletion = this.getNodeParameter('waitForCompletion', i) as boolean;
 						const maxWaitTime = this.getNodeParameter('maxWaitTime', i, 120) as number;
 
-						// Get metadata
 						const metadataParam = this.getNodeParameter('metadata', i) as {
 							metadataValues?: Array<{ key: string; value: string }>;
 						};
 						const metadataValues = metadataParam.metadataValues || [];
 
-						// Get binary data
 						const binaryData = this.helpers.assertBinaryData(i, binaryPropertyName);
 						const buffer = await this.helpers.getBinaryDataBuffer(i, binaryPropertyName);
 
-						// Build upload URL
 						const uploadUrl = `https://generativelanguage.googleapis.com/upload/v1beta/${storeName}:uploadToFileSearchStore?key=${apiKey}`;
 
 						let uploadResponse: { document?: Document };
 
-						// If we have metadata or display name, use multipart upload
 						if (metadataValues.length > 0 || documentDisplayName) {
-							// Build customMetadata array in the format Google expects
 							const customMetadata: Array<{
 								key: string;
 								stringValue?: string;
 								numericValue?: number;
 							}> = [];
+
 							for (const { key, value } of metadataValues) {
 								if (key && value !== undefined && value !== null) {
-									// Convert to string first (value might be boolean, number, etc.)
 									const strValue = String(value).trim();
-
-									// Only treat as numeric if:
-									// 1. It's a pure number (integer or float)
-									// 2. The entire string is consumed by the number
 									const numValue = Number(strValue);
 									const isPureNumber =
 										strValue !== '' &&
@@ -481,42 +428,26 @@ export class GoogleFileSearch implements INodeType {
 									if (isPureNumber) {
 										customMetadata.push({ key, numericValue: numValue });
 									} else {
-										// Everything else is a string (dates, booleans, IDs, etc.)
 										customMetadata.push({ key, stringValue: strValue });
 									}
 								}
 							}
 
-							// Build the metadata JSON part
 							const metadataObj: {
 								displayName?: string;
-								customMetadata?: Array<{
-									key: string;
-									stringValue?: string;
-									numericValue?: number;
-								}>;
+								customMetadata?: typeof customMetadata;
 							} = {};
-							if (documentDisplayName) {
-								metadataObj.displayName = documentDisplayName;
-							}
-							if (customMetadata.length > 0) {
-								metadataObj.customMetadata = customMetadata;
-							}
 
-							// Create multipart request body
+							if (documentDisplayName) metadataObj.displayName = documentDisplayName;
+							if (customMetadata.length > 0) metadataObj.customMetadata = customMetadata;
+
 							const boundary = '----n8nBoundary' + Date.now().toString(16);
 							const mimeType = binaryData.mimeType || 'application/octet-stream';
 
-							// Build multipart body
 							const metadataPart = Buffer.from(
-								`--${boundary}\r\n` +
-									'Content-Type: application/json; charset=UTF-8\r\n\r\n' +
-									JSON.stringify(metadataObj) +
-									'\r\n',
+								`--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${JSON.stringify(metadataObj)}\r\n`,
 							);
-							const filePart = Buffer.from(
-								`--${boundary}\r\n` + `Content-Type: ${mimeType}\r\n\r\n`,
-							);
+							const filePart = Buffer.from(`--${boundary}\r\nContent-Type: ${mimeType}\r\n\r\n`);
 							const endBoundary = Buffer.from(`\r\n--${boundary}--`);
 
 							const multipartBody = Buffer.concat([metadataPart, filePart, buffer, endBoundary]);
@@ -532,7 +463,6 @@ export class GoogleFileSearch implements INodeType {
 								json: true,
 							})) as { document?: Document };
 						} else {
-							// Simple raw upload without metadata
 							uploadResponse = (await this.helpers.httpRequest({
 								method: 'POST',
 								url: uploadUrl,
@@ -547,7 +477,6 @@ export class GoogleFileSearch implements INodeType {
 
 						result = uploadResponse;
 
-						// Poll for completion if requested
 						if (waitForCompletion && uploadResponse.document?.name) {
 							const docName = uploadResponse.document.name;
 							const startTime = Date.now();
@@ -569,7 +498,6 @@ export class GoogleFileSearch implements INodeType {
 									});
 								}
 
-								// Wait 2 seconds before polling again
 								await sleep(2000);
 							}
 
@@ -596,7 +524,6 @@ export class GoogleFileSearch implements INodeType {
 
 						result = importResponse;
 
-						// Poll for completion if requested
 						if (waitForCompletion && importResponse.document?.name) {
 							const docName = importResponse.document.name;
 							const startTime = Date.now();
@@ -636,7 +563,6 @@ export class GoogleFileSearch implements INodeType {
 							json: true,
 						})) as { documents?: Document[] };
 
-						// Return each document as a separate item
 						const documents = response.documents || [];
 						for (const doc of documents) {
 							returnData.push({
@@ -644,7 +570,7 @@ export class GoogleFileSearch implements INodeType {
 								pairedItem: { item: i },
 							});
 						}
-						continue; // Skip the default push at the end
+						continue;
 					} else if (operation === 'get') {
 						const documentName = this.getNodeParameter('documentName', i) as string;
 						result = await this.helpers.httpRequest({
@@ -658,32 +584,44 @@ export class GoogleFileSearch implements INodeType {
 						const url = forceDelete
 							? `${BASE_URL}/${documentName}?force=true&key=${apiKey}`
 							: `${BASE_URL}/${documentName}?key=${apiKey}`;
-						await this.helpers.httpRequest({
-							method: 'DELETE',
-							url,
-							json: true,
-							returnFullResponse: false,
-						});
-						// DELETE returns empty response, so we return success indicator
+						await this.helpers.httpRequest({ method: 'DELETE', url, json: true });
 						result = { success: true, deleted: documentName };
 					}
 				}
 
 				// ==================== QUERY OPERATIONS ====================
 				else if (resource === 'query') {
-					if (operation === 'generateContent') {
-						const model = this.getNodeParameter('model', i) as string;
-						const prompt = this.getNodeParameter('prompt', i) as string;
+					if (operation === 'search') {
+						let query = this.getNodeParameter('query', i, '') as string;
+
+						// Fallback: check if query comes from input item (when used as AI Agent tool)
+						if (!query && items[i].json) {
+							query =
+								(items[i].json.query as string) ||
+								(items[i].json.prompt as string) ||
+								(items[i].json.chatInput as string) ||
+								(items[i].json.input as string) ||
+								'';
+						}
+
+						if (!query) {
+							throw new NodeOperationError(this.getNode(), 'Query is required', { itemIndex: i });
+						}
+
 						const storeNamesStr = this.getNodeParameter('storeNames', i) as string;
-						const metadataFilter = this.getNodeParameter('metadataFilter', i) as string;
-						const systemPrompt = this.getNodeParameter('systemPrompt', i) as string;
-						const options = this.getNodeParameter('options', i) as IDataObject;
+						const metadataFilter = this.getNodeParameter('metadataFilter', i, '') as string;
+						const additionalFields = this.getNodeParameter('additionalFields', i) as IDataObject;
+
+						const model = (additionalFields.model as string) || 'gemini-2.5-flash';
+						const temperature = (additionalFields.temperature as number) ?? 1.0;
+						const maxOutputTokens = (additionalFields.maxOutputTokens as number) ?? 8192;
+						const systemPrompt = (additionalFields.systemPrompt as string) || '';
+						const includeGrounding = (additionalFields.includeGrounding as boolean) ?? true;
 
 						const storeNames = storeNamesStr.split(',').map((s) => s.trim());
 
-						// Build request body
 						const body: IDataObject = {
-							contents: [{ parts: [{ text: prompt }] }],
+							contents: [{ parts: [{ text: query }] }],
 							tools: [
 								{
 									fileSearch: {
@@ -692,23 +630,11 @@ export class GoogleFileSearch implements INodeType {
 									},
 								},
 							],
+							generationConfig: { temperature, maxOutputTokens },
 						};
 
-						// Add system instruction if provided
 						if (systemPrompt) {
 							body.systemInstruction = { parts: [{ text: systemPrompt }] };
-						}
-
-						// Add generation config
-						const generationConfig: IDataObject = {};
-						if (options.temperature !== undefined) {
-							generationConfig.temperature = options.temperature;
-						}
-						if (options.maxOutputTokens !== undefined) {
-							generationConfig.maxOutputTokens = options.maxOutputTokens;
-						}
-						if (Object.keys(generationConfig).length > 0) {
-							body.generationConfig = generationConfig;
 						}
 
 						result = await this.helpers.httpRequest({
@@ -717,14 +643,10 @@ export class GoogleFileSearch implements INodeType {
 							headers: { 'Content-Type': 'application/json' },
 							body,
 							json: true,
-							returnFullResponse: false,
 						});
 
-						// Optionally extract just the text if grounding is not needed
-						if (
-							options.includeGrounding === false &&
-							(result as any).candidates?.[0]?.content?.parts?.[0]?.text
-						) {
+						// Extract just the text if grounding is not needed
+						if (!includeGrounding && (result as any).candidates?.[0]?.content?.parts?.[0]?.text) {
 							result = {
 								text: (result as any).candidates[0].content.parts[0].text,
 								model,
@@ -733,22 +655,31 @@ export class GoogleFileSearch implements INodeType {
 					}
 				}
 
-				returnData.push({
-					json: safeSerialize(result),
-					pairedItem: { item: i },
-				});
+				returnData.push({ json: safeSerialize(result), pairedItem: { item: i } });
 			} catch (error) {
+				let errorMessage = error.message;
+				let errorDetails: IDataObject = {};
+
+				if (error.response?.body) {
+					errorDetails = error.response.body as IDataObject;
+					if (typeof errorDetails === 'object' && errorDetails.error) {
+						const apiError = errorDetails.error as IDataObject;
+						errorMessage = (apiError.message as string) || errorMessage;
+					}
+				}
+
 				if (this.continueOnFail()) {
 					returnData.push({
-						json: {
-							error: error.message,
-							success: false,
-						},
+						json: { error: errorMessage, errorDetails, success: false },
 						pairedItem: { item: i },
 					});
 					continue;
 				}
-				throw error;
+
+				throw new NodeOperationError(this.getNode(), errorMessage, {
+					itemIndex: i,
+					description: JSON.stringify(errorDetails),
+				});
 			}
 		}
 
