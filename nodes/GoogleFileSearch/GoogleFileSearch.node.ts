@@ -1,7 +1,9 @@
 import {
 	IDataObject,
 	IExecuteFunctions,
+	ILoadOptionsFunctions,
 	INodeExecutionData,
+	INodePropertyOptions,
 	INodeType,
 	INodeTypeDescription,
 	NodeConnectionTypes,
@@ -33,6 +35,21 @@ interface Document {
 	sizeBytes?: string;
 	mimeType?: string;
 	displayName?: string;
+}
+
+interface Store {
+	name: string;
+	displayName?: string;
+	createTime?: string;
+	updateTime?: string;
+}
+
+interface GeminiResponse {
+	candidates?: Array<{
+		content?: {
+			parts?: Array<{ text?: string }>;
+		};
+	}>;
 }
 
 export class GoogleFileSearch implements INodeType {
@@ -96,14 +113,16 @@ export class GoogleFileSearch implements INodeType {
 				description: 'A user-friendly name for the store',
 			},
 			{
-				displayName: 'Store Name',
-				name: 'storeName',
-				type: 'string',
+				displayName: 'Store',
+				name: 'storeId',
+				type: 'options',
+				typeOptions: {
+					loadOptionsMethod: 'getStores',
+				},
 				default: '',
 				required: true,
 				displayOptions: { show: { resource: ['store'], operation: ['get', 'delete'] } },
-				description: 'The store resource name (e.g., fileSearchStores/abc123-xyz)',
-				placeholder: 'fileSearchStores/my-store-id',
+				description: 'The store to operate on. Choose from the list, or specify an ID using an <a href="https://docs.n8n.io/code/expressions/">expression</a>.',
 			},
 			{
 				displayName: 'Force Delete',
@@ -131,14 +150,16 @@ export class GoogleFileSearch implements INodeType {
 				default: 'list',
 			},
 			{
-				displayName: 'Store Name',
-				name: 'storeName',
-				type: 'string',
+				displayName: 'Store',
+				name: 'documentStoreId',
+				type: 'options',
+				typeOptions: {
+					loadOptionsMethod: 'getStores',
+				},
 				default: '',
 				required: true,
 				displayOptions: { show: { resource: ['document'] } },
-				description: 'The store to operate on (e.g., fileSearchStores/abc123)',
-				placeholder: 'fileSearchStores/my-store-id',
+				description: 'The store to operate on. Choose from the list, or specify an ID using an <a href="https://docs.n8n.io/code/expressions/">expression</a>.',
 			},
 			{
 				displayName: 'Document Name',
@@ -253,14 +274,16 @@ export class GoogleFileSearch implements INodeType {
 				placeholder: '{{ $fromAI("query", "The search query") }}',
 			},
 			{
-				displayName: 'Store Names',
+				displayName: 'Stores',
 				name: 'storeNames',
-				type: 'string',
-				default: '',
+				type: 'multiOptions',
+				typeOptions: {
+					loadOptionsMethod: 'getStores',
+				},
+				default: [],
 				required: true,
 				displayOptions: { show: { resource: ['query'], operation: ['search'] } },
-				description: 'Comma-separated list of store names to search',
-				placeholder: 'fileSearchStores/store1,fileSearchStores/store2',
+				description: 'The stores to search. Choose from the list, or specify IDs using an <a href="https://docs.n8n.io/code/expressions/">expression</a>.',
 			},
 			{
 				displayName: 'Metadata Filter',
@@ -326,6 +349,32 @@ export class GoogleFileSearch implements INodeType {
 		],
 	};
 
+	methods = {
+		loadOptions: {
+			async getStores(this: ILoadOptionsFunctions): Promise<INodePropertyOptions[]> {
+				const credentials = await this.getCredentials('googlePalmApi');
+				const apiKey = credentials.apiKey as string;
+
+				try {
+					const response = (await this.helpers.httpRequest({
+						method: 'GET',
+						url: `https://generativelanguage.googleapis.com/v1beta/fileSearchStores?key=${apiKey}`,
+						json: true,
+					})) as { fileSearchStores?: Store[] };
+
+					const stores = response.fileSearchStores || [];
+					return stores.map((store) => ({
+						name: store.displayName || store.name.replace('fileSearchStores/', ''),
+						value: store.name,
+					}));
+				} catch {
+					// Return empty array if API fails (e.g., no stores yet)
+					return [];
+				}
+			},
+		},
+	};
+
 	async execute(this: IExecuteFunctions): Promise<INodeExecutionData[][]> {
 		const items = this.getInputData();
 		const returnData: INodeExecutionData[] = [];
@@ -367,25 +416,25 @@ export class GoogleFileSearch implements INodeType {
 						}
 						continue;
 					} else if (operation === 'get') {
-						const storeName = this.getNodeParameter('storeName', i) as string;
+						const storeId = this.getNodeParameter('storeId', i) as string;
 						result = await this.helpers.httpRequest({
 							method: 'GET',
-							url: `${BASE_URL}/${storeName}?key=${apiKey}`,
+							url: `${BASE_URL}/${storeId}?key=${apiKey}`,
 							json: true,
 						});
 					} else if (operation === 'delete') {
-						const storeName = this.getNodeParameter('storeName', i) as string;
+						const storeId = this.getNodeParameter('storeId', i) as string;
 						const forceDelete = this.getNodeParameter('forceDelete', i) as boolean;
 						const url = forceDelete
-							? `${BASE_URL}/${storeName}?force=true&key=${apiKey}`
-							: `${BASE_URL}/${storeName}?key=${apiKey}`;
+							? `${BASE_URL}/${storeId}?force=true&key=${apiKey}`
+							: `${BASE_URL}/${storeId}?key=${apiKey}`;
 						result = await this.helpers.httpRequest({ method: 'DELETE', url, json: true });
 					}
 				}
 
 				// ==================== DOCUMENT OPERATIONS ====================
 				else if (resource === 'document') {
-					let storeName = this.getNodeParameter('storeName', i) as string;
+					let storeName = this.getNodeParameter('documentStoreId', i) as string;
 					if (!storeName.startsWith('fileSearchStores/')) {
 						storeName = `fileSearchStores/${storeName}`;
 					}
@@ -608,7 +657,7 @@ export class GoogleFileSearch implements INodeType {
 							throw new NodeOperationError(this.getNode(), 'Query is required', { itemIndex: i });
 						}
 
-						const storeNamesStr = this.getNodeParameter('storeNames', i) as string;
+						const storeNames = this.getNodeParameter('storeNames', i) as string[];
 						const metadataFilter = this.getNodeParameter('metadataFilter', i, '') as string;
 						const additionalFields = this.getNodeParameter('additionalFields', i) as IDataObject;
 
@@ -617,8 +666,6 @@ export class GoogleFileSearch implements INodeType {
 						const maxOutputTokens = (additionalFields.maxOutputTokens as number) ?? 8192;
 						const systemPrompt = (additionalFields.systemPrompt as string) || '';
 						const includeGrounding = (additionalFields.includeGrounding as boolean) ?? true;
-
-						const storeNames = storeNamesStr.split(',').map((s) => s.trim());
 
 						const body: IDataObject = {
 							contents: [{ parts: [{ text: query }] }],
@@ -646,9 +693,10 @@ export class GoogleFileSearch implements INodeType {
 						});
 
 						// Extract just the text if grounding is not needed
-						if (!includeGrounding && (result as any).candidates?.[0]?.content?.parts?.[0]?.text) {
+						const geminiResult = result as GeminiResponse;
+						if (!includeGrounding && geminiResult.candidates?.[0]?.content?.parts?.[0]?.text) {
 							result = {
-								text: (result as any).candidates[0].content.parts[0].text,
+								text: geminiResult.candidates[0].content.parts[0].text,
 								model,
 							};
 						}

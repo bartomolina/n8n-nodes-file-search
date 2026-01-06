@@ -7,10 +7,6 @@ settings:
 importers:
 
   .:
-    dependencies:
-      n8n-workflow:
-        specifier: '*'
-        version: 1.112.0
     devDependencies:
       '@types/node':
         specifier: ^22.0.0
@@ -27,6 +23,9 @@ importers:
       gulp:
         specifier: ^5.0.0
         version: 5.0.1
+      n8n-workflow:
+        specifier: ^2.3.0
+        version: 2.3.0
       prettier:
         specifier: ^3.5.3
         version: 3.6.2
@@ -860,6 +859,10 @@ packages:
   json-stable-stringify-without-jsonify@1.0.1:
     resolution: {integrity: sha512-Bdboy+l7tA3OGW6FjyFHWkP5LuByj1Tk33Ljyq0axyzdk9//JSi2u3fP1QSmd1KNwq6VOKYGlAu87CisVir6Pw==}
 
+  jsonrepair@3.13.1:
+    resolution: {integrity: sha512-WJeiE0jGfxYmtLwBTEk8+y/mYcaleyLXWaqp5bJu0/ZTSeG0KQq/wWQ8pmnkKenEdN6pdnn6QtcoSUkbqDHWNw==}
+    hasBin: true
+
   jssha@3.3.1:
     resolution: {integrity: sha512-VCMZj12FCFMQYcFLPRm/0lOBbLi8uM2BhXPTqw3U4YAfs4AZfiApOoBLoN8cQE60Z50m1MYMTQVCfgF/KaCVhQ==}
 
@@ -956,8 +959,8 @@ packages:
     resolution: {integrity: sha512-32GSKM3Wyc8dg/p39lWPKYu8zci9mJFzV1Np9Of0ZEpe6Fhssn/FbI7ywAMd40uX+p3ZKh3T5EeCFv81qS3HmQ==}
     engines: {node: '>= 10.13.0'}
 
-  n8n-workflow@1.112.0:
-    resolution: {integrity: sha512-O8Et2XNqXPXHXzUYtx+E0MKg9Sc+ged7bE3opz77kWtA2xoBmLQxhwZyH3+XVsHTC+1l/XLcov251G4AMG85Bw==}
+  n8n-workflow@2.3.0:
+    resolution: {integrity: sha512-pTwJ0VcVuk5AoehTR7TP5yj6k/IeejU7xe27uiDbUmLNpeS6bQstYsGamOkUzqIS6pbP8CiZWd3tKD57hjLihg==}
 
   natural-compare@1.4.0:
     resolution: {integrity: sha512-OWND8ei3VtNC9h7V60qff3SVobHr996CTwgxubgyQYEpg290h9J0buyECNNJexkFm5sOajh5G116RYA1c8ZMSw==}
@@ -2328,6 +2331,8 @@ snapshots:
 
   json-stable-stringify-without-jsonify@1.0.1: {}
 
+  jsonrepair@3.13.1: {}
+
   jssha@3.3.1: {}
 
   keyv@4.5.4:
@@ -2414,16 +2419,17 @@ snapshots:
 
   mute-stdout@2.0.0: {}
 
-  n8n-workflow@1.112.0:
+  n8n-workflow@2.3.0:
     dependencies:
       '@n8n/errors': 0.5.0
       '@n8n/tournament': 1.0.6
-      ast-types: 0.15.2
+      ast-types: 0.16.1
       callsites: 3.1.0
       esprima-next: 5.8.4
       form-data: 4.0.0
       jmespath: 0.16.0
       js-base64: 3.7.2
+      jsonrepair: 3.13.1
       jssha: 3.3.1
       lodash: 4.17.21
       luxon: 3.4.4
