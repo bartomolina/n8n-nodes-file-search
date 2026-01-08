@@ -113,7 +113,7 @@ export class GoogleFileSearch implements INodeType {
 				description: 'A user-friendly name for the store',
 			},
 			{
-				displayName: 'Store',
+				displayName: 'Store Name or ID',
 				name: 'storeId',
 				type: 'options',
 				typeOptions: {
@@ -122,7 +122,8 @@ export class GoogleFileSearch implements INodeType {
 				default: '',
 				required: true,
 				displayOptions: { show: { resource: ['store'], operation: ['get', 'delete'] } },
-				description: 'The store to operate on. Choose from the list, or specify an ID using an <a href="https://docs.n8n.io/code/expressions/">expression</a>.',
+				description:
+					'The store to operate on. Choose from the list, or specify an ID using an <a href="https://docs.n8n.io/code/expressions/">expression</a>.',
 			},
 			{
 				displayName: 'Force Delete',
@@ -150,7 +151,7 @@ export class GoogleFileSearch implements INodeType {
 				default: 'list',
 			},
 			{
-				displayName: 'Store',
+				displayName: 'Store Name or ID',
 				name: 'documentStoreId',
 				type: 'options',
 				typeOptions: {
@@ -159,7 +160,8 @@ export class GoogleFileSearch implements INodeType {
 				default: '',
 				required: true,
 				displayOptions: { show: { resource: ['document'] } },
-				description: 'The store to operate on. Choose from the list, or specify an ID using an <a href="https://docs.n8n.io/code/expressions/">expression</a>.',
+				description:
+					'The store to operate on. Choose from the list, or specify an ID using an <a href="https://docs.n8n.io/code/expressions/">expression</a>.',
 			},
 			{
 				displayName: 'Document Name',
@@ -169,7 +171,7 @@ export class GoogleFileSearch implements INodeType {
 				required: true,
 				displayOptions: { show: { resource: ['document'], operation: ['get', 'delete'] } },
 				description: 'The document resource name',
-				placeholder: 'fileSearchStores/store-id/documents/doc-id',
+				placeholder: 'fileSearchStores/store-ID/documents/doc-ID',
 			},
 			{
 				displayName: 'Force Delete',
@@ -196,7 +198,7 @@ export class GoogleFileSearch implements INodeType {
 				description: 'Display name for the document (used in citations)',
 			},
 			{
-				displayName: 'File Name (from Files API)',
+				displayName: 'File Name (From Files API)',
 				name: 'fileName',
 				type: 'string',
 				default: '',
@@ -233,7 +235,7 @@ export class GoogleFileSearch implements INodeType {
 				description: 'Whether to poll until the document is fully indexed',
 			},
 			{
-				displayName: 'Max Wait Time (seconds)',
+				displayName: 'Max Wait Time (Seconds)',
 				name: 'maxWaitTime',
 				type: 'number',
 				default: 120,
@@ -274,7 +276,7 @@ export class GoogleFileSearch implements INodeType {
 				placeholder: '{{ $fromAI("query", "The search query") }}',
 			},
 			{
-				displayName: 'Stores',
+				displayName: 'Store Names or IDs',
 				name: 'storeNames',
 				type: 'multiOptions',
 				typeOptions: {
@@ -283,7 +285,8 @@ export class GoogleFileSearch implements INodeType {
 				default: [],
 				required: true,
 				displayOptions: { show: { resource: ['query'], operation: ['search'] } },
-				description: 'The stores to search. Choose from the list, or specify IDs using an <a href="https://docs.n8n.io/code/expressions/">expression</a>.',
+				description:
+					'The stores to search. Choose from the list, or specify IDs using an <a href="https://docs.n8n.io/code/expressions/">expression</a>.',
 			},
 			{
 				displayName: 'Metadata Filter',

@@ -1,59 +1,61 @@
 {
-	"name": "n8n-nodes-file-search",
-	"version": "0.1.21",
-	"description": "n8n node for Google File Search (Gemini API RAG)",
-	"keywords": [
-		"n8n-community-node-package",
-		"google",
-		"gemini",
-		"file-search",
-		"rag"
-	],
-	"license": "MIT",
-	"homepage": "https://ai.google.dev/gemini-api/docs/file-search",
-	"author": {
-		"name": "Barto Molina",
-		"email": "barto@avara.xyz"
-	},
-	"repository": {
-		"type": "git",
-		"url": "https://github.com/bartomolina/n8n-nodes-file-search.git"
-	},
-	"engines": {
-		"node": ">=20.15"
-	},
-	"main": "index.js",
-	"scripts": {
-		"build": "npx rimraf dist && tsc && gulp build:icons",
-		"dev": "tsc --watch",
-		"format": "prettier nodes --write",
-		"lint": "eslint nodes package.json",
-		"lintfix": "eslint nodes package.json --fix",
-		"prepublishOnly": "npm run build"
-	},
-	"files": [
-		"dist"
-	],
-	"n8n": {
-		"n8nNodesApiVersion": 1,
-		"credentials": [],
-		"nodes": [
-			"dist/nodes/GoogleFileSearch/GoogleFileSearch.node.js"
-		]
-	},
-	"devDependencies": {
-		"@types/node": "^22.0.0",
-		"@typescript-eslint/parser": "~8.32.0",
-		"eslint": "^8.57.0",
-		"eslint-plugin-n8n-nodes-base": "^1.16.3",
-		"gulp": "^5.0.0",
-		"n8n-workflow": "^2.3.0",
-		"prettier": "^3.5.3",
-		"rimraf": "^6.0.1",
-		"typescript": "^5.8.2"
-	},
-	"peerDependencies": {
-		"n8n-workflow": "*"
-	},
-	"packageManager": "pnpm@10.18.2+sha512.9fb969fa749b3ade6035e0f109f0b8a60b5d08a1a87fdf72e337da90dcc93336e2280ca4e44f2358a649b83c17959e9993e777c2080879f3801e6f0d999ad3dd"
+  "name": "n8n-nodes-file-search",
+  "version": "0.1.21",
+  "description": "n8n node for Google File Search (Gemini API RAG)",
+  "keywords": [
+    "n8n-community-node-package",
+    "google",
+    "gemini",
+    "file-search",
+    "rag"
+  ],
+  "license": "MIT",
+  "homepage": "https://ai.google.dev/gemini-api/docs/file-search",
+  "author": {
+    "name": "Barto Molina",
+    "email": "barto@avara.xyz"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/bartomolina/n8n-nodes-file-search.git"
+  },
+  "engines": {
+    "node": ">=20.15"
+  },
+  "main": "index.js",
+  "scripts": {
+    "build": "npx rimraf dist && tsc && gulp build:icons",
+    "dev": "tsc --watch",
+    "format": "prettier nodes --write",
+    "lint": "eslint nodes package.json",
+    "lintfix": "eslint nodes package.json --fix",
+    "prepublishOnly": "npm run build",
+    "release": "release-it"
+  },
+  "files": [
+    "dist"
+  ],
+  "n8n": {
+    "n8nNodesApiVersion": 1,
+    "credentials": [],
+    "nodes": [
+      "dist/nodes/GoogleFileSearch/GoogleFileSearch.node.js"
+    ]
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "@typescript-eslint/parser": "~8.32.0",
+    "eslint": "^8.57.0",
+    "eslint-plugin-n8n-nodes-base": "^1.16.3",
+    "gulp": "^5.0.0",
+    "n8n-workflow": "^2.3.0",
+    "prettier": "^3.5.3",
+    "release-it": "^19.2.3",
+    "rimraf": "^6.0.1",
+    "typescript": "^5.8.2"
+  },
+  "peerDependencies": {
+    "n8n-workflow": "*"
+  },
+  "packageManager": "pnpm@10.18.2+sha512.9fb969fa749b3ade6035e0f109f0b8a60b5d08a1a87fdf72e337da90dcc93336e2280ca4e44f2358a649b83c17959e9993e777c2080879f3801e6f0d999ad3dd"
 }
