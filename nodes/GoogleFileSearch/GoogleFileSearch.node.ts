@@ -52,6 +52,17 @@ interface GeminiResponse {
 	}>;
 }
 
+interface InteractionResponse {
+	id?: string;
+	status?: string;
+	error?: string;
+	outputs?: Array<{
+		text?: string;
+		[key: string]: unknown;
+	}>;
+	[key: string]: unknown;
+}
+
 export class GoogleFileSearch implements INodeType {
 	description: INodeTypeDescription = {
 		displayName: 'Google File Search',
@@ -133,6 +144,25 @@ export class GoogleFileSearch implements INodeType {
 				displayOptions: { show: { resource: ['store'], operation: ['delete'] } },
 				description: 'Whether to force delete even if store contains documents',
 			},
+			{
+				displayName: 'Return All',
+				name: 'returnAllStores',
+				type: 'boolean',
+				default: false,
+				displayOptions: { show: { resource: ['store'], operation: ['list'] } },
+				description: 'Whether to return all results or only up to a given limit',
+			},
+			{
+				displayName: 'Limit',
+				name: 'limitStores',
+				type: 'number',
+				default: 50,
+				typeOptions: { minValue: 1 },
+				displayOptions: {
+					show: { resource: ['store'], operation: ['list'], returnAllStores: [false] },
+				},
+				description: 'Max number of results to return',
+			},
 
 			// ==================== DOCUMENT OPERATIONS ====================
 			{
@@ -180,6 +210,25 @@ export class GoogleFileSearch implements INodeType {
 				default: true,
 				displayOptions: { show: { resource: ['document'], operation: ['delete'] } },
 				description: 'Whether to force delete even if document contains content',
+			},
+			{
+				displayName: 'Return All',
+				name: 'returnAllDocuments',
+				type: 'boolean',
+				default: false,
+				displayOptions: { show: { resource: ['document'], operation: ['list'] } },
+				description: 'Whether to return all results or only up to a given limit',
+			},
+			{
+				displayName: 'Limit',
+				name: 'limitDocuments',
+				type: 'number',
+				default: 50,
+				typeOptions: { minValue: 1 },
+				displayOptions: {
+					show: { resource: ['document'], operation: ['list'], returnAllDocuments: [false] },
+				},
+				description: 'Max number of results to return',
 			},
 			{
 				displayName: 'Input Data Field',
@@ -258,6 +307,11 @@ export class GoogleFileSearch implements INodeType {
 				displayOptions: { show: { resource: ['query'] } },
 				options: [
 					{
+						name: 'Deep Research',
+						value: 'deepResearch',
+						action: 'Run deep research agent for comprehensive analysis',
+					},
+					{
 						name: 'Search',
 						value: 'search',
 						action: 'Search documents and generate a response',
@@ -265,15 +319,94 @@ export class GoogleFileSearch implements INodeType {
 				],
 				default: 'search',
 			},
+			// ==================== DEEP RESEARCH PARAMETERS ====================
 			{
-				displayName: 'Query',
-				name: 'query',
+				displayName: 'Research Query',
+				name: 'researchQuery',
+				type: 'string',
+				typeOptions: {
+					rows: 4,
+				},
+				default: '',
+				required: true,
+				displayOptions: { show: { resource: ['query'], operation: ['deepResearch'] } },
+				description: 'The research task for the Deep Research agent',
+				placeholder:
+					'e.g., Research the competitive landscape of EV batteries and provide a detailed analysis',
+			},
+			{
+				displayName: 'Include File Search Stores',
+				name: 'includeFileSearch',
+				type: 'boolean',
+				default: false,
+				displayOptions: { show: { resource: ['query'], operation: ['deepResearch'] } },
+				description:
+					'Whether to include your File Search stores as data sources (experimental). By default, the agent searches the public web.',
+			},
+			{
+				displayName: 'Store Names or IDs',
+				name: 'deepResearchStoreNames',
+				type: 'multiOptions',
+				typeOptions: {
+					loadOptionsMethod: 'getStores',
+				},
+				default: [],
+				displayOptions: {
+					show: { resource: ['query'], operation: ['deepResearch'], includeFileSearch: [true] },
+				},
+				description:
+					'File Search stores to include in the research. Choose from the list, or specify IDs using an <a href="https://docs.n8n.io/code/expressions/">expression</a>.',
+			},
+			{
+				displayName: 'Output Format Instructions',
+				name: 'outputFormat',
+				type: 'string',
+				typeOptions: {
+					rows: 3,
+				},
+				default: '',
+				displayOptions: { show: { resource: ['query'], operation: ['deepResearch'] } },
+				description:
+					'Optional formatting instructions for the output (e.g., "Format as a technical report with Executive Summary, Key Findings, and Recommendations sections")',
+				placeholder: 'e.g., Format the output as a technical report with sections...',
+			},
+			{
+				displayName: 'Max Wait Time (Minutes)',
+				name: 'deepResearchMaxWait',
+				type: 'number',
+				default: 30,
+				typeOptions: { minValue: 1, maxValue: 60 },
+				displayOptions: { show: { resource: ['query'], operation: ['deepResearch'] } },
+				description:
+					'Maximum time to wait for research completion (1-60 minutes). Deep Research tasks typically take 5-20 minutes.',
+			},
+			{
+				displayName: 'Previous Interaction ID',
+				name: 'previousInteractionId',
 				type: 'string',
 				default: '',
-				displayOptions: { show: { resource: ['query'], operation: ['search'] } },
+				displayOptions: { show: { resource: ['query'], operation: ['deepResearch'] } },
 				description:
-					'The search query. When used as a tool, use $fromAI() to let the AI Agent provide this value.',
-				placeholder: '{{ $fromAI("query", "The search query") }}',
+					'Continue a previous research conversation. Provide the interaction ID from a completed Deep Research to ask follow-up questions.',
+				placeholder: 'e.g., interactions/abc123',
+			},
+
+			// ==================== SEARCH PARAMETERS ====================
+			{
+				displayName: 'Model',
+				name: 'model',
+				type: 'options',
+				displayOptions: { show: { resource: ['query'], operation: ['search'] } },
+				options: [
+					{ name: 'Gemini 2.0 Flash', value: 'gemini-2.0-flash' },
+					{ name: 'Gemini 2.5 Flash', value: 'gemini-2.5-flash' },
+					{ name: 'Gemini 2.5 Flash Lite', value: 'gemini-2.5-flash-lite' },
+					{ name: 'Gemini 2.5 Pro', value: 'gemini-2.5-pro' },
+					{ name: 'Gemini 3 Flash Preview', value: 'gemini-3-flash-preview' },
+					{ name: 'Gemini 3 Pro Preview', value: 'gemini-3-pro-preview' },
+				],
+				default: 'gemini-3-flash-preview',
+				description: 'The Gemini model to use for generation',
 			},
 			{
 				displayName: 'Store Names or IDs',
@@ -289,13 +422,43 @@ export class GoogleFileSearch implements INodeType {
 					'The stores to search. Choose from the list, or specify IDs using an <a href="https://docs.n8n.io/code/expressions/">expression</a>.',
 			},
 			{
+				displayName: 'Query',
+				name: 'query',
+				type: 'string',
+				default: '',
+				displayOptions: { show: { resource: ['query'], operation: ['search'] } },
+				description: 'The search query to execute against the selected stores',
+				placeholder: 'e.g., What are the main findings in the report?',
+			},
+			{
 				displayName: 'Metadata Filter',
 				name: 'metadataFilter',
 				type: 'string',
 				default: '',
 				displayOptions: { show: { resource: ['query'], operation: ['search'] } },
 				description: 'Filter query using AIP-160-like syntax',
-				placeholder: 'year = 2025 AND episode_type = "rollup"',
+				placeholder: 'e.g., category = "reports" AND status = "published"',
+			},
+			{
+				displayName: 'Structured Output',
+				name: 'structuredOutput',
+				type: 'boolean',
+				default: false,
+				displayOptions: { show: { resource: ['query'], operation: ['search'] } },
+				description:
+					'Whether to return a structured JSON response matching a schema (requires Gemini 3+ models)',
+			},
+			{
+				displayName: 'JSON Schema',
+				name: 'jsonSchema',
+				type: 'json',
+				default:
+					'{\n  "type": "object",\n  "properties": {\n    "answer": { "type": "string", "description": "The answer to the query" },\n    "sources": { "type": "array", "items": { "type": "string" }, "description": "List of source references" }\n  },\n  "required": ["answer"]\n}',
+				displayOptions: {
+					show: { resource: ['query'], operation: ['search'], structuredOutput: [true] },
+				},
+				description:
+					'JSON Schema that defines the structure of the response. See <a href="https://ai.google.dev/gemini-api/docs/structured-output">Gemini Structured Output docs</a> for supported schema properties.',
 			},
 			{
 				displayName: 'Additional Fields',
@@ -316,21 +479,8 @@ export class GoogleFileSearch implements INodeType {
 						displayName: 'Max Output Tokens',
 						name: 'maxOutputTokens',
 						type: 'number',
-						default: 8192,
-						description: 'Maximum tokens in the response',
-					},
-					{
-						displayName: 'Model',
-						name: 'model',
-						type: 'options',
-						options: [
-							{ name: 'Gemini 2.0 Flash', value: 'gemini-2.0-flash' },
-							{ name: 'Gemini 2.5 Flash', value: 'gemini-2.5-flash' },
-							{ name: 'Gemini 2.5 Pro', value: 'gemini-2.5-pro' },
-							{ name: 'Gemini 3 Flash Preview', value: 'gemini-3-flash-preview' },
-						],
-						default: 'gemini-2.5-flash',
-						description: 'The Gemini model to use for generation',
+						default: '',
+						description: 'Maximum tokens in the response. Leave empty to use model default.',
 					},
 					{
 						displayName: 'System Prompt',
@@ -359,6 +509,8 @@ export class GoogleFileSearch implements INodeType {
 				const apiKey = credentials.apiKey as string;
 
 				try {
+					// Fetch first page of stores (typically 100) - enough for dropdown selection
+					// Users with more stores can use expressions to specify store names directly
 					const response = (await this.helpers.httpRequest({
 						method: 'GET',
 						url: `https://generativelanguage.googleapis.com/v1beta/fileSearchStores?key=${apiKey}`,
@@ -407,16 +559,33 @@ export class GoogleFileSearch implements INodeType {
 							json: true,
 						});
 					} else if (operation === 'list') {
-						const response = (await this.helpers.httpRequest({
-							method: 'GET',
-							url: `${BASE_URL}/fileSearchStores?key=${apiKey}`,
-							json: true,
-						})) as { fileSearchStores?: IDataObject[] };
+						const returnAll = this.getNodeParameter('returnAllStores', i) as boolean;
+						const limit = this.getNodeParameter('limitStores', i, 50) as number;
 
-						const stores = response.fileSearchStores || [];
-						for (const store of stores) {
-							returnData.push({ json: safeSerialize(store), pairedItem: { item: i } });
-						}
+						let nextPageToken: string | undefined;
+						let totalFetched = 0;
+
+						fetchLoop: do {
+							const url = nextPageToken
+								? `${BASE_URL}/fileSearchStores?key=${apiKey}&pageToken=${nextPageToken}`
+								: `${BASE_URL}/fileSearchStores?key=${apiKey}`;
+
+							const response = (await this.helpers.httpRequest({
+								method: 'GET',
+								url,
+								json: true,
+							})) as { fileSearchStores?: IDataObject[]; nextPageToken?: string };
+
+							const stores = response.fileSearchStores || [];
+							for (const store of stores) {
+								returnData.push({ json: safeSerialize(store), pairedItem: { item: i } });
+								totalFetched++;
+								if (!returnAll && totalFetched >= limit) {
+									break fetchLoop;
+								}
+							}
+							nextPageToken = response.nextPageToken;
+						} while (nextPageToken && (returnAll || totalFetched < limit));
 						continue;
 					} else if (operation === 'get') {
 						const storeId = this.getNodeParameter('storeId', i) as string;
@@ -609,19 +778,36 @@ export class GoogleFileSearch implements INodeType {
 							}
 						}
 					} else if (operation === 'list') {
-						const response = (await this.helpers.httpRequest({
-							method: 'GET',
-							url: `${BASE_URL}/${storeName}/documents?key=${apiKey}`,
-							json: true,
-						})) as { documents?: Document[] };
+						const returnAll = this.getNodeParameter('returnAllDocuments', i) as boolean;
+						const limit = this.getNodeParameter('limitDocuments', i, 50) as number;
 
-						const documents = response.documents || [];
-						for (const doc of documents) {
-							returnData.push({
-								json: safeSerialize(doc as unknown as IDataObject),
-								pairedItem: { item: i },
-							});
-						}
+						let nextPageToken: string | undefined;
+						let totalFetched = 0;
+
+						fetchLoop: do {
+							const url = nextPageToken
+								? `${BASE_URL}/${storeName}/documents?key=${apiKey}&pageToken=${nextPageToken}`
+								: `${BASE_URL}/${storeName}/documents?key=${apiKey}`;
+
+							const response = (await this.helpers.httpRequest({
+								method: 'GET',
+								url,
+								json: true,
+							})) as { documents?: Document[]; nextPageToken?: string };
+
+							const documents = response.documents || [];
+							for (const doc of documents) {
+								returnData.push({
+									json: safeSerialize(doc as unknown as IDataObject),
+									pairedItem: { item: i },
+								});
+								totalFetched++;
+								if (!returnAll && totalFetched >= limit) {
+									break fetchLoop;
+								}
+							}
+							nextPageToken = response.nextPageToken;
+						} while (nextPageToken && (returnAll || totalFetched < limit));
 						continue;
 					} else if (operation === 'get') {
 						const documentName = this.getNodeParameter('documentName', i) as string;
@@ -643,7 +829,140 @@ export class GoogleFileSearch implements INodeType {
 
 				// ==================== QUERY OPERATIONS ====================
 				else if (resource === 'query') {
-					if (operation === 'search') {
+					if (operation === 'deepResearch') {
+						// Deep Research uses the Interactions API
+						let researchQuery = this.getNodeParameter('researchQuery', i, '') as string;
+
+						// Fallback: check if query comes from input item (when used as AI Agent tool)
+						if (!researchQuery && items[i].json) {
+							researchQuery =
+								(items[i].json.query as string) ||
+								(items[i].json.prompt as string) ||
+								(items[i].json.chatInput as string) ||
+								(items[i].json.input as string) ||
+								'';
+						}
+
+						if (!researchQuery) {
+							throw new NodeOperationError(this.getNode(), 'Research query is required', {
+								itemIndex: i,
+							});
+						}
+
+						const includeFileSearch = this.getNodeParameter(
+							'includeFileSearch',
+							i,
+							false,
+						) as boolean;
+						const outputFormat = this.getNodeParameter('outputFormat', i, '') as string;
+						const maxWaitMinutes = this.getNodeParameter('deepResearchMaxWait', i, 30) as number;
+						const previousInteractionId = this.getNodeParameter(
+							'previousInteractionId',
+							i,
+							'',
+						) as string;
+
+						// Build the input with optional format instructions
+						let input = researchQuery;
+						if (outputFormat) {
+							input = `${researchQuery}\n\n${outputFormat}`;
+						}
+
+						// Build tools array (file_search is optional)
+						const tools: Array<{ type: string; file_search_store_names?: string[] }> = [];
+						if (includeFileSearch) {
+							const storeNames = this.getNodeParameter('deepResearchStoreNames', i, []) as string[];
+							if (storeNames.length > 0) {
+								tools.push({
+									type: 'file_search',
+									file_search_store_names: storeNames,
+								});
+							}
+						}
+
+						// Create the interaction (starts research in background)
+						const interactionBody: IDataObject = {
+							input,
+							agent: 'deep-research-pro-preview-12-2025',
+							background: true,
+							store: true,
+						};
+
+						if (tools.length > 0) {
+							interactionBody.tools = tools;
+						}
+
+						// Add previous interaction ID for follow-up questions
+						if (previousInteractionId) {
+							interactionBody.previous_interaction_id = previousInteractionId;
+						}
+
+						const interaction = (await this.helpers.httpRequest({
+							method: 'POST',
+							url: `${BASE_URL}/interactions?key=${apiKey}`,
+							headers: { 'Content-Type': 'application/json' },
+							body: interactionBody,
+							json: true,
+						})) as InteractionResponse;
+
+						if (!interaction.id) {
+							throw new NodeOperationError(
+								this.getNode(),
+								'Failed to start Deep Research: No interaction ID returned',
+								{ itemIndex: i },
+							);
+						}
+
+						// Poll for completion
+						const startTime = Date.now();
+						const maxWaitMs = maxWaitMinutes * 60 * 1000;
+						const pollInterval = 10000; // 10 seconds
+
+						let finalResult: InteractionResponse = interaction;
+
+						while (Date.now() - startTime < maxWaitMs) {
+							const statusResponse = (await this.helpers.httpRequest({
+								method: 'GET',
+								url: `${BASE_URL}/interactions/${interaction.id}?key=${apiKey}`,
+								json: true,
+							})) as InteractionResponse;
+
+							if (statusResponse.status === 'completed') {
+								finalResult = statusResponse;
+								break;
+							} else if (statusResponse.status === 'failed') {
+								throw new NodeOperationError(
+									this.getNode(),
+									`Deep Research failed: ${statusResponse.error || 'Unknown error'}`,
+									{ itemIndex: i },
+								);
+							}
+
+							// Still in progress, wait before polling again
+							await sleep(pollInterval);
+						}
+
+						// Check if we timed out
+						if (finalResult.status !== 'completed') {
+							result = {
+								interactionId: interaction.id,
+								status: 'timeout',
+								message: `Research still in progress after ${maxWaitMinutes} minutes. You can check the status later using the interaction ID.`,
+								elapsedMinutes: Math.round((Date.now() - startTime) / 60000),
+							};
+						} else {
+							// Extract the final report text
+							const outputs = finalResult.outputs || [];
+							const reportText = outputs.length > 0 ? outputs[outputs.length - 1].text : '';
+
+							result = {
+								interactionId: interaction.id,
+								status: 'completed',
+								report: reportText,
+								outputs: outputs,
+							};
+						}
+					} else if (operation === 'search') {
 						let query = this.getNodeParameter('query', i, '') as string;
 
 						// Fallback: check if query comes from input item (when used as AI Agent tool)
@@ -661,14 +980,35 @@ export class GoogleFileSearch implements INodeType {
 						}
 
 						const storeNames = this.getNodeParameter('storeNames', i) as string[];
+						const model = this.getNodeParameter('model', i) as string;
 						const metadataFilter = this.getNodeParameter('metadataFilter', i, '') as string;
+						const structuredOutput = this.getNodeParameter('structuredOutput', i, false) as boolean;
 						const additionalFields = this.getNodeParameter('additionalFields', i) as IDataObject;
-
-						const model = (additionalFields.model as string) || 'gemini-2.5-flash';
 						const temperature = (additionalFields.temperature as number) ?? 1.0;
-						const maxOutputTokens = (additionalFields.maxOutputTokens as number) ?? 8192;
+						const maxOutputTokens = additionalFields.maxOutputTokens as number | undefined;
 						const systemPrompt = (additionalFields.systemPrompt as string) || '';
 						const includeGrounding = (additionalFields.includeGrounding as boolean) ?? true;
+
+						const generationConfig: IDataObject = { temperature };
+						if (maxOutputTokens) {
+							generationConfig.maxOutputTokens = maxOutputTokens;
+						}
+
+						// Add structured output configuration (Gemini 3+ feature)
+						if (structuredOutput) {
+							const jsonSchemaString = this.getNodeParameter('jsonSchema', i, '{}') as string;
+							try {
+								const jsonSchema = JSON.parse(jsonSchemaString);
+								generationConfig.responseMimeType = 'application/json';
+								generationConfig.responseSchema = jsonSchema;
+							} catch {
+								throw new NodeOperationError(
+									this.getNode(),
+									'Invalid JSON Schema: Please provide a valid JSON object',
+									{ itemIndex: i },
+								);
+							}
+						}
 
 						const body: IDataObject = {
 							contents: [{ parts: [{ text: query }] }],
@@ -680,7 +1020,7 @@ export class GoogleFileSearch implements INodeType {
 									},
 								},
 							],
-							generationConfig: { temperature, maxOutputTokens },
+							generationConfig,
 						};
 
 						if (systemPrompt) {
@@ -695,11 +1035,26 @@ export class GoogleFileSearch implements INodeType {
 							json: true,
 						});
 
-						// Extract just the text if grounding is not needed
+						// Extract and format the response
 						const geminiResult = result as GeminiResponse;
-						if (!includeGrounding && geminiResult.candidates?.[0]?.content?.parts?.[0]?.text) {
+						const responseText = geminiResult.candidates?.[0]?.content?.parts?.[0]?.text;
+
+						if (structuredOutput && responseText) {
+							// Parse the structured JSON response
+							try {
+								const parsedResponse = JSON.parse(responseText);
+								result = includeGrounding
+									? { data: parsedResponse, model, groundingMetadata: geminiResult }
+									: { data: parsedResponse, model };
+							} catch {
+								// If parsing fails, return the raw text
+								result = includeGrounding
+									? { text: responseText, model, parseError: true, groundingMetadata: geminiResult }
+									: { text: responseText, model, parseError: true };
+							}
+						} else if (!includeGrounding && responseText) {
 							result = {
-								text: geminiResult.candidates[0].content.parts[0].text,
+								text: responseText,
 								model,
 							};
 						}
