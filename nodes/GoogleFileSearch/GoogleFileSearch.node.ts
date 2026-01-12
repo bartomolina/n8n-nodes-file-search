@@ -145,23 +145,13 @@ export class GoogleFileSearch implements INodeType {
 				description: 'Whether to force delete even if store contains documents',
 			},
 			{
-				displayName: 'Return All',
-				name: 'returnAllStores',
-				type: 'boolean',
-				default: false,
+				displayName: 'Pagination Cursor',
+				name: 'paginationCursorStores',
+				type: 'string',
+				default: '',
 				displayOptions: { show: { resource: ['store'], operation: ['list'] } },
-				description: 'Whether to return all results or only up to a given limit',
-			},
-			{
-				displayName: 'Limit',
-				name: 'limitStores',
-				type: 'number',
-				default: 50,
-				typeOptions: { minValue: 1 },
-				displayOptions: {
-					show: { resource: ['store'], operation: ['list'], returnAllStores: [false] },
-				},
-				description: 'Max number of results to return',
+				description:
+					'Cursor to fetch the next page of results. Use the nextPageToken from a previous response.',
 			},
 
 			// ==================== DOCUMENT OPERATIONS ====================
@@ -212,23 +202,13 @@ export class GoogleFileSearch implements INodeType {
 				description: 'Whether to force delete even if document contains content',
 			},
 			{
-				displayName: 'Return All',
-				name: 'returnAllDocuments',
-				type: 'boolean',
-				default: false,
+				displayName: 'Pagination Cursor',
+				name: 'paginationCursorDocuments',
+				type: 'string',
+				default: '',
 				displayOptions: { show: { resource: ['document'], operation: ['list'] } },
-				description: 'Whether to return all results or only up to a given limit',
-			},
-			{
-				displayName: 'Limit',
-				name: 'limitDocuments',
-				type: 'number',
-				default: 50,
-				typeOptions: { minValue: 1 },
-				displayOptions: {
-					show: { resource: ['document'], operation: ['list'], returnAllDocuments: [false] },
-				},
-				description: 'Max number of results to return',
+				description:
+					'Cursor to fetch the next page of results. Use the nextPageToken from a previous response.',
 			},
 			{
 				displayName: 'Input Data Field',
@@ -559,33 +539,38 @@ export class GoogleFileSearch implements INodeType {
 							json: true,
 						});
 					} else if (operation === 'list') {
-						const returnAll = this.getNodeParameter('returnAllStores', i) as boolean;
-						const limit = this.getNodeParameter('limitStores', i, 50) as number;
+						const paginationCursor = this.getNodeParameter(
+							'paginationCursorStores',
+							i,
+							'',
+						) as string;
 
-						let nextPageToken: string | undefined;
-						let totalFetched = 0;
+						const url = paginationCursor
+							? `${BASE_URL}/fileSearchStores?key=${apiKey}&pageToken=${paginationCursor}`
+							: `${BASE_URL}/fileSearchStores?key=${apiKey}`;
 
-						fetchLoop: do {
-							const url = nextPageToken
-								? `${BASE_URL}/fileSearchStores?key=${apiKey}&pageToken=${nextPageToken}`
-								: `${BASE_URL}/fileSearchStores?key=${apiKey}`;
+						const response = (await this.helpers.httpRequest({
+							method: 'GET',
+							url,
+							json: true,
+						})) as { fileSearchStores?: IDataObject[]; nextPageToken?: string };
 
-							const response = (await this.helpers.httpRequest({
-								method: 'GET',
-								url,
-								json: true,
-							})) as { fileSearchStores?: IDataObject[]; nextPageToken?: string };
+						const stores = response.fileSearchStores || [];
+						for (const store of stores) {
+							returnData.push({ json: safeSerialize(store), pairedItem: { item: i } });
+						}
 
-							const stores = response.fileSearchStores || [];
-							for (const store of stores) {
-								returnData.push({ json: safeSerialize(store), pairedItem: { item: i } });
-								totalFetched++;
-								if (!returnAll && totalFetched >= limit) {
-									break fetchLoop;
-								}
-							}
-							nextPageToken = response.nextPageToken;
-						} while (nextPageToken && (returnAll || totalFetched < limit));
+						// Add pagination info if there are more results
+						if (response.nextPageToken) {
+							returnData.push({
+								json: {
+									_pagination: true,
+									nextPageToken: response.nextPageToken,
+									message: 'More results available. Use this nextPageToken to fetch the next page.',
+								},
+								pairedItem: { item: i },
+							});
+						}
 						continue;
 					} else if (operation === 'get') {
 						const storeId = this.getNodeParameter('storeId', i) as string;
@@ -778,36 +763,41 @@ export class GoogleFileSearch implements INodeType {
 							}
 						}
 					} else if (operation === 'list') {
-						const returnAll = this.getNodeParameter('returnAllDocuments', i) as boolean;
-						const limit = this.getNodeParameter('limitDocuments', i, 50) as number;
+						const paginationCursor = this.getNodeParameter(
+							'paginationCursorDocuments',
+							i,
+							'',
+						) as string;
 
-						let nextPageToken: string | undefined;
-						let totalFetched = 0;
+						const url = paginationCursor
+							? `${BASE_URL}/${storeName}/documents?key=${apiKey}&pageToken=${paginationCursor}`
+							: `${BASE_URL}/${storeName}/documents?key=${apiKey}`;
 
-						fetchLoop: do {
-							const url = nextPageToken
-								? `${BASE_URL}/${storeName}/documents?key=${apiKey}&pageToken=${nextPageToken}`
-								: `${BASE_URL}/${storeName}/documents?key=${apiKey}`;
+						const response = (await this.helpers.httpRequest({
+							method: 'GET',
+							url,
+							json: true,
+						})) as { documents?: Document[]; nextPageToken?: string };
 
-							const response = (await this.helpers.httpRequest({
-								method: 'GET',
-								url,
-								json: true,
-							})) as { documents?: Document[]; nextPageToken?: string };
+						const documents = response.documents || [];
+						for (const doc of documents) {
+							returnData.push({
+								json: safeSerialize(doc as unknown as IDataObject),
+								pairedItem: { item: i },
+							});
+						}
 
-							const documents = response.documents || [];
-							for (const doc of documents) {
-								returnData.push({
-									json: safeSerialize(doc as unknown as IDataObject),
-									pairedItem: { item: i },
-								});
-								totalFetched++;
-								if (!returnAll && totalFetched >= limit) {
-									break fetchLoop;
-								}
-							}
-							nextPageToken = response.nextPageToken;
-						} while (nextPageToken && (returnAll || totalFetched < limit));
+						// Add pagination info if there are more results
+						if (response.nextPageToken) {
+							returnData.push({
+								json: {
+									_pagination: true,
+									nextPageToken: response.nextPageToken,
+									message: 'More results available. Use this nextPageToken to fetch the next page.',
+								},
+								pairedItem: { item: i },
+							});
+						}
 						continue;
 					} else if (operation === 'get') {
 						const documentName = this.getNodeParameter('documentName', i) as string;
