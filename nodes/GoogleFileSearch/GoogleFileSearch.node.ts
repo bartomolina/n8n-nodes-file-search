@@ -555,23 +555,10 @@ export class GoogleFileSearch implements INodeType {
 							json: true,
 						})) as { fileSearchStores?: IDataObject[]; nextPageToken?: string };
 
-						const stores = response.fileSearchStores || [];
-						for (const store of stores) {
-							returnData.push({ json: safeSerialize(store), pairedItem: { item: i } });
-						}
-
-						// Add pagination info if there are more results
-						if (response.nextPageToken) {
-							returnData.push({
-								json: {
-									_pagination: true,
-									nextPageToken: response.nextPageToken,
-									message: 'More results available. Use this nextPageToken to fetch the next page.',
-								},
-								pairedItem: { item: i },
-							});
-						}
-						continue;
+						result = {
+							items: response.fileSearchStores || [],
+							nextPageToken: response.nextPageToken || null,
+						};
 					} else if (operation === 'get') {
 						const storeId = this.getNodeParameter('storeId', i) as string;
 						result = await this.helpers.httpRequest({
@@ -779,26 +766,10 @@ export class GoogleFileSearch implements INodeType {
 							json: true,
 						})) as { documents?: Document[]; nextPageToken?: string };
 
-						const documents = response.documents || [];
-						for (const doc of documents) {
-							returnData.push({
-								json: safeSerialize(doc as unknown as IDataObject),
-								pairedItem: { item: i },
-							});
-						}
-
-						// Add pagination info if there are more results
-						if (response.nextPageToken) {
-							returnData.push({
-								json: {
-									_pagination: true,
-									nextPageToken: response.nextPageToken,
-									message: 'More results available. Use this nextPageToken to fetch the next page.',
-								},
-								pairedItem: { item: i },
-							});
-						}
-						continue;
+						result = {
+							items: response.documents || [],
+							nextPageToken: response.nextPageToken || null,
+						};
 					} else if (operation === 'get') {
 						const documentName = this.getNodeParameter('documentName', i) as string;
 						result = await this.helpers.httpRequest({
