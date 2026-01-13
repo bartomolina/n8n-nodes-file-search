@@ -489,11 +489,11 @@ export class GoogleFileSearch implements INodeType {
 				const apiKey = credentials.apiKey as string;
 
 				try {
-					// Fetch first page of stores (typically 100) - enough for dropdown selection
+					// Fetch first page of stores with max page size (20) for dropdown selection
 					// Users with more stores can use expressions to specify store names directly
 					const response = (await this.helpers.httpRequest({
 						method: 'GET',
-						url: `https://generativelanguage.googleapis.com/v1beta/fileSearchStores?key=${apiKey}`,
+						url: `https://generativelanguage.googleapis.com/v1beta/fileSearchStores?key=${apiKey}&pageSize=20`,
 						json: true,
 					})) as { fileSearchStores?: Store[] };
 
@@ -546,8 +546,8 @@ export class GoogleFileSearch implements INodeType {
 						) as string;
 
 						const url = paginationCursor
-							? `${BASE_URL}/fileSearchStores?key=${apiKey}&pageToken=${paginationCursor}`
-							: `${BASE_URL}/fileSearchStores?key=${apiKey}`;
+							? `${BASE_URL}/fileSearchStores?key=${apiKey}&pageSize=20&pageToken=${paginationCursor}`
+							: `${BASE_URL}/fileSearchStores?key=${apiKey}&pageSize=20`;
 
 						const response = (await this.helpers.httpRequest({
 							method: 'GET',
@@ -761,8 +761,8 @@ export class GoogleFileSearch implements INodeType {
 						) as string;
 
 						const url = paginationCursor
-							? `${BASE_URL}/${storeName}/documents?key=${apiKey}&pageToken=${paginationCursor}`
-							: `${BASE_URL}/${storeName}/documents?key=${apiKey}`;
+							? `${BASE_URL}/${storeName}/documents?key=${apiKey}&pageSize=20&pageToken=${paginationCursor}`
+							: `${BASE_URL}/${storeName}/documents?key=${apiKey}&pageSize=20`;
 
 						const response = (await this.helpers.httpRequest({
 							method: 'GET',
