@@ -179,7 +179,7 @@ export class GoogleFileSearch implements INodeType {
 				},
 				default: '',
 				required: true,
-				displayOptions: { show: { resource: ['document'] } },
+				displayOptions: { show: { resource: ['document'], operation: ['list', 'upload', 'import'] } },
 				description:
 					'The store to operate on. Choose from the list, or specify an ID using an <a href="https://docs.n8n.io/code/expressions/">expression</a>.',
 			},
@@ -578,9 +578,13 @@ export class GoogleFileSearch implements INodeType {
 
 				// ==================== DOCUMENT OPERATIONS ====================
 				else if (resource === 'document') {
-					let storeName = this.getNodeParameter('documentStoreId', i) as string;
-					if (!storeName.startsWith('fileSearchStores/')) {
-						storeName = `fileSearchStores/${storeName}`;
+					// Get store name only for operations that need it (list, upload, import)
+					let storeName = '';
+					if (['list', 'upload', 'import'].includes(operation)) {
+						storeName = this.getNodeParameter('documentStoreId', i) as string;
+						if (!storeName.startsWith('fileSearchStores/')) {
+							storeName = `fileSearchStores/${storeName}`;
+						}
 					}
 
 					if (operation === 'upload') {
