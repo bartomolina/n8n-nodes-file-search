@@ -11,6 +11,7 @@ import {
 } from 'n8n-workflow';
 
 const BASE_URL = 'https://generativelanguage.googleapis.com/v1beta';
+const INTERACTIONS_API_REVISION = '2026-05-20';
 
 // Helper function for async sleep
 const sleep = (ms: number): Promise<void> =>
@@ -60,8 +61,29 @@ interface InteractionResponse {
 		text?: string;
 		[key: string]: unknown;
 	}>;
+	steps?: Array<{
+		type?: string;
+		content?: Array<{
+			text?: string;
+			[key: string]: unknown;
+		}>;
+		[key: string]: unknown;
+	}>;
 	[key: string]: unknown;
 }
+
+const getInteractionTextOutputs = (interaction: InteractionResponse): Array<{ text?: string }> => {
+	if (interaction.outputs?.length) {
+		return interaction.outputs;
+	}
+
+	return (
+		interaction.steps
+			?.filter((step) => step.type === 'model_output')
+			.flatMap((step) => step.content || [])
+			.filter((content) => typeof content.text === 'string') || []
+	);
+};
 
 export class GoogleFileSearch implements INodeType {
 	description: INodeTypeDescription = {
@@ -865,7 +887,10 @@ export class GoogleFileSearch implements INodeType {
 						const interaction = (await this.helpers.httpRequest({
 							method: 'POST',
 							url: `${BASE_URL}/interactions?key=${apiKey}`,
-							headers: { 'Content-Type': 'application/json' },
+							headers: {
+								'Content-Type': 'application/json',
+								'Api-Revision': INTERACTIONS_API_REVISION,
+							},
 							body: interactionBody,
 							json: true,
 						})) as InteractionResponse;
@@ -889,6 +914,7 @@ export class GoogleFileSearch implements INodeType {
 							const statusResponse = (await this.helpers.httpRequest({
 								method: 'GET',
 								url: `${BASE_URL}/interactions/${interaction.id}?key=${apiKey}`,
+								headers: { 'Api-Revision': INTERACTIONS_API_REVISION },
 								json: true,
 							})) as InteractionResponse;
 
@@ -917,7 +943,7 @@ export class GoogleFileSearch implements INodeType {
 							};
 						} else {
 							// Extract the final report text
-							const outputs = finalResult.outputs || [];
+							const outputs = getInteractionTextOutputs(finalResult);
 							const reportText = outputs.length > 0 ? outputs[outputs.length - 1].text : '';
 
 							result = {
@@ -925,6 +951,7 @@ export class GoogleFileSearch implements INodeType {
 								status: 'completed',
 								report: reportText,
 								outputs: outputs,
+								steps: finalResult.steps,
 							};
 						}
 					} else if (operation === 'search') {
